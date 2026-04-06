@@ -40,6 +40,13 @@ namespace CSVLibrary
 
         public static void Write<T>(string path, T t, bool hasAddHeader = false)
         {
+            List<T> values = new List<T>() { t };
+
+            WriteList(path, values, hasAddHeader);
+        }
+
+        public static void WriteList<T>(string path, List<T> t, bool hasAddHeader = false) // TODO:埋個伏筆
+        {
             CheckFile(path);
 
             HeaderManager headerManager = new HeaderManager();
@@ -47,37 +54,21 @@ namespace CSVLibrary
 
             Type type = typeof(T);
             PropertyInfo[] props = type.GetProperties();
-            List<string> string_props_value = new List<string>();
-            foreach (PropertyInfo prop in props) { string_props_value.Add(prop.GetValue(t).ToString()); }
 
             headerCheck = headerManager.HeadersCheck<T>(path);
 
-            if (!headerCheck && hasAddHeader)
-            {
-                headerManager.AddHeader<T>(path);
-                string text = string.Join(",", string_props_value);
+            if (!headerCheck && hasAddHeader) { headerManager.AddHeader<T>(path); }
 
-                using (StreamWriter outputFile = new StreamWriter(path, true))
+            using (StreamWriter outputFile = new StreamWriter(path, true))
+            {
+                foreach (T _t in t)
                 {
+                    List<string> string_props_value = new List<string>();
+                    foreach (PropertyInfo prop in props) { string_props_value.Add(prop.GetValue(_t).ToString()); }
+                    string text = string.Join(",", string_props_value);
+
                     outputFile.WriteLine(text);
                 }
-            }
-            else
-            {
-                string text = string.Join(",", string_props_value);
-
-                using (StreamWriter outputFile = new StreamWriter(path, true))
-                {
-                    outputFile.WriteLine(text);
-                }
-            }
-        }
-
-        public static void WriteList<T>(string path, List<T> t, bool hasAddHeader = false) // TODO:埋個伏筆
-        {
-            foreach (T _t in t)
-            {
-                Write(path, _t, hasAddHeader);
             }
         }
 
