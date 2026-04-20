@@ -20,7 +20,8 @@ namespace CSVLibrary
             // read header 問題
             // 10~20張 5MB 圖檔
 
-            string filepath = "C:\\Users\\Albert\\Github\\repos\\private\\c_sharp\\leo_class\\winform\\Accounting\\WriteTextAsync.txt";
+            //string filepath = "C:\\Users\\Albert\\Github\\repos\\private\\c_sharp\\leo_class\\winform\\Accounting\\WriteTextAsync.txt";
+            string filepath = @"C:\Users\Albert\Github\repos\private\c_sharp\leo_class\console\ParallelProcessingData\ReadData\records.csv";
             //string writepath = "C:\\Users\\Albert\\Github\\repos\\private\\c_sharp\\leo_class\\winform\\Accounting\\WriteTextAsync-2.txt";
 
             //CSVHelper.CheckFile(filepath);

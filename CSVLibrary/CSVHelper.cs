@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,24 +18,71 @@ namespace CSVLibrary
             Type type = typeof(T);
 
             HeaderManager headerManager = new HeaderManager();
+            // Object Relaction Mapping => ORM 物件關聯關係對應
             headerManager.GetFileHeaderPlace(path);
 
-            // Object Relaction Mapping => ORM 物件關聯關係對應
-            List<string> dataLines = headerManager.RemoveHeader(path);
-
-            foreach (var dataline in dataLines)
+            using (StreamReader sr = new StreamReader(path))
             {
-                string[] datas = dataline.Split(',');
-                T t = new T();
+                string line = sr.ReadLine(); // exclude headers
 
-                for (int i = 0; i < datas.Length; i++)
+                while (!sr.EndOfStream)
                 {
-                    PropertyInfo[] props = type.GetProperties();
+                    line = sr.ReadLine();
 
-                    props[i].SetValue(t, datas[headerManager.headerPlace[props[i].Name]]);
+                    string[] datas = line.Split(',');
+                    T t = new T();
+
+                    for (int j = 0; j < datas.Length; j++)
+                    {
+                        PropertyInfo[] props = type.GetProperties();
+
+                        props[j].SetValue(t, datas[headerManager.headerPlace[props[j].Name]]);
+                    }
+
+                    _list.Add(t);
                 }
-                _list.Add(t);
             }
+
+            return _list;
+        }
+
+
+        public static List<T> Read<T>(string path, int start, int quantity) where T : class, new()
+        {
+            List<T> _list = new List<T>();
+            Type type = typeof(T);
+            PropertyInfo[] props = type.GetProperties();
+
+            HeaderManager headerManager = new HeaderManager();
+            headerManager.GetFileHeaderPlace(path);
+
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line = sr.ReadLine(); // exclude headers
+
+                int lineCount = 0;
+                while (!sr.EndOfStream)
+                {
+                    line = sr.ReadLine();
+                    lineCount++;
+
+                    if (lineCount >= start && lineCount < start + quantity)
+                    {
+                        string[] datas = line.Split(',');
+                        T t = new T();
+
+                        for (int j = 0; j < datas.Length; j++)
+                        {
+                            props[j].SetValue(t, datas[headerManager.headerPlace[props[j].Name]]);
+                        }
+
+                        _list.Add(t);
+                    }
+
+                    if (lineCount >= start + quantity) break;
+                }
+            }
+
             return _list;
         }
 

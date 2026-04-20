@@ -33,7 +33,6 @@ namespace CSVLibrary
 
         public bool HeadersCheck<T>(string path)
         {
-
             Type type = typeof(T);
             PropertyInfo[] props = type.GetProperties();
 
