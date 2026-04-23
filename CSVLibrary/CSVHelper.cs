@@ -93,7 +93,7 @@ namespace CSVLibrary
             WriteList(path, values, hasAddHeader);
         }
 
-        public static void WriteList<T>(string path, List<T> t, bool hasAddHeader = false) // TODO:埋個伏筆
+        public static void WriteList<T>(string path, List<T> t, bool hasAddHeader = false)
         {
             CheckFile(path);
 
