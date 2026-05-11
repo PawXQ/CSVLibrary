@@ -46,7 +46,6 @@ namespace CSVLibrary
             return _list;
         }
 
-
         public static List<T> Read<T>(string path, int start, int quantity) where T : class, new()
         {
             List<T> _list = new List<T>();
@@ -86,6 +85,53 @@ namespace CSVLibrary
             return _list;
         }
 
+        public static List<T> ReadMpd<T>(string path, long seek, long seekRow, long startRow, int quantity) where T : class, new()
+        {
+            List<T> _list = new List<T>();
+            Type type = typeof(T);
+            PropertyInfo[] props = type.GetProperties();
+
+            HeaderManager headerManager = new HeaderManager();
+            headerManager.GetFileHeaderPlace(path);
+
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line;
+
+                sr.BaseStream.Seek(seek, SeekOrigin.Begin);
+
+                while (seekRow < startRow)
+                {
+                    sr.ReadLine();
+                    seekRow++;
+                }
+
+                int lineCount = 0;
+                while (!sr.EndOfStream)
+                {
+                    line = sr.ReadLine();
+                    lineCount++;
+
+                    if (lineCount <= quantity)
+                    {
+                        string[] datas = line.Split(',');
+                        T t = new T();
+
+                        for (int j = 0; j < datas.Length; j++)
+                        {
+                            props[j].SetValue(t, datas[headerManager.headerPlace[props[j].Name]]);
+                        }
+
+                        _list.Add(t);
+                    }
+
+                    if (lineCount >= quantity) break;
+                }
+            }
+
+            return _list;
+        }
+
         public static void Write<T>(string path, T t, bool hasAddHeader = false)
         {
             List<T> values = new List<T>() { t };
@@ -117,6 +163,7 @@ namespace CSVLibrary
 
                     outputFile.WriteLine(text);
                 }
+                outputFile.Flush();
             }
         }
 
