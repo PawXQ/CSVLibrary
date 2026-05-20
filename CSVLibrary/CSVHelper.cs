@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -12,6 +13,45 @@ namespace CSVLibrary
 {
     public class CSVHelper
     {
+        private static Type Type = null;
+        private static PropertyInfo[] props = null;
+
+        delegate void SetterDelegate(object obj, object value);
+
+        private static SetterDelegate[] setters = null;
+
+        protected static char[] CoreNewLine = new char[2] { '\r', '\n' };
+
+        static SetterDelegate CreateSetter(PropertyInfo propertyInfo)
+        {
+            var targetParm = Expression.Parameter(typeof(object));
+            var targetValue = Expression.Parameter(typeof(object));
+
+            Expression castTarget = Expression.Convert(targetParm, propertyInfo.DeclaringType);
+            Expression castValue = Expression.Convert(targetValue, propertyInfo.PropertyType);
+
+            MethodCallExpression methodCall = Expression.Call(castTarget, propertyInfo.GetSetMethod(), castValue);
+            SetterDelegate setterDelegate = Expression.Lambda<SetterDelegate>(methodCall, targetParm, targetValue).Compile();
+
+            return setterDelegate;
+        }
+
+        delegate object GetterDelegate(object obj);
+        //static StringBuilder stringBuilder = new StringBuilder(90);
+        //static char[] buffer = new char[90];
+        static GetterDelegate[] getters = null;
+        static GetterDelegate CreateGetter(PropertyInfo propertyInfo)
+        {
+            var targetParm = Expression.Parameter(typeof(object));
+
+            Expression castTarget = Expression.Convert(targetParm, propertyInfo.DeclaringType);
+
+            MethodCallExpression methodCall = Expression.Call(castTarget, propertyInfo.GetGetMethod());
+            GetterDelegate getterDelegate = Expression.Lambda<GetterDelegate>(methodCall, targetParm).Compile();
+
+            return getterDelegate;
+        }
+
         public static List<T> Read<T>(string path) where T : class, new()
         {
             List<T> _list = new List<T>();
@@ -132,6 +172,75 @@ namespace CSVLibrary
             return _list;
         }
 
+        public static List<T> OptimizeReadMpd<T>(string path, long seek, long seekRow, long startRow, int quantity) where T : class, new()
+        {
+            List<T> _list = new List<T>();
+
+            if (setters == null)
+            {
+                Type = typeof(T);
+                props = Type.GetProperties();
+
+                setters = props.Select(x => CreateSetter(x)).ToArray();
+            }
+
+            //HeaderManager headerManager = new HeaderManager();
+            //headerManager.GetFileHeaderPlace(path);
+
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line;
+
+                sr.BaseStream.Seek(seek, SeekOrigin.Begin);
+
+                while (seekRow < startRow)
+                {
+                    sr.ReadLine();
+                    seekRow++;
+                }
+
+                string[] datas = new string[props.Length];
+
+                int lineCount = 0;
+                while (!sr.EndOfStream)
+                {
+                    line = sr.ReadLine();
+                    lineCount++;
+
+                    if (lineCount <= quantity)
+                    {
+                        ReadOnlySpan<char> dataAsSpan = line.AsSpan();
+                        int index = 0;
+
+                        T t = new T();
+
+                        while (true)
+                        {
+                            int commaPos = dataAsSpan.IndexOf(',');
+                            if (commaPos == -1)
+                            {
+                                //datas[index] = dataAsSpan.ToString();
+                                setters[index++](t, dataAsSpan.ToString());
+                                break;
+                            }
+
+                            //datas[index++] = dataAsSpan.Slice(0, commaPos).ToString();
+
+                            setters[index++](t, dataAsSpan.Slice(0, commaPos).ToString());
+
+                            dataAsSpan = dataAsSpan.Slice(commaPos + 1);
+                        }
+
+                        _list.Add(t);
+                    }
+
+                    if (lineCount >= quantity) break;
+                }
+            }
+
+            return _list;
+        }
+
         public static void Write<T>(string path, T t, bool hasAddHeader = false)
         {
             List<T> values = new List<T>() { t };
@@ -162,6 +271,53 @@ namespace CSVLibrary
                     string text = string.Join(",", string_props_value);
 
                     outputFile.WriteLine(text);
+                }
+                outputFile.Flush();
+            }
+        }
+
+        public static void OptimizeWriteList<T>(string path, List<T> t, bool hasAddHeader = false)
+        {
+            CheckFile(path);
+
+            //HeaderManager headerManager = new HeaderManager();
+            //bool headerCheck;
+
+            //headerCheck = headerManager.HeadersCheck<T>(path);
+
+            //if (!headerCheck && hasAddHeader) { headerManager.AddHeader<T>(path); }
+
+            if (getters == null)
+            {
+                Type = typeof(T);
+                props = Type.GetProperties();
+
+                getters = props.Select(x => CreateGetter(x)).ToArray();
+            }
+            StringBuilder stringBuilder = new StringBuilder();
+            char[] buffer = null;
+
+            using (StreamWriter outputFile = new StreamWriter(path, true))
+            {
+                for (int i = 0; i < t.Count; i++)
+                {
+                    for (int j = 0; j < props.Count(); j++)
+                    {
+                        stringBuilder.Append(getters[j](t[i]).ToString());
+                        if (j < props.Count() - 1)
+                        {
+                            stringBuilder.Append(',');
+                        }
+                    }
+                    stringBuilder.Append("\r\n");
+                    //
+                    buffer = new char[stringBuilder.Length];
+                    //
+                    stringBuilder.CopyTo(0, buffer, 0, stringBuilder.Length);
+
+                    outputFile.Write(buffer, 0, stringBuilder.Length);
+
+                    stringBuilder.Clear();
                 }
                 outputFile.Flush();
             }
