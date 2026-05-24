@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -19,8 +20,6 @@ namespace CSVLibrary
         delegate void SetterDelegate(object obj, object value);
 
         private static SetterDelegate[] setters = null;
-
-        protected static char[] CoreNewLine = new char[2] { '\r', '\n' };
 
         static SetterDelegate CreateSetter(PropertyInfo propertyInfo)
         {
@@ -40,6 +39,7 @@ namespace CSVLibrary
         //static StringBuilder stringBuilder = new StringBuilder(90);
         //static char[] buffer = new char[90];
         static GetterDelegate[] getters = null;
+
         static GetterDelegate CreateGetter(PropertyInfo propertyInfo)
         {
             var targetParm = Expression.Parameter(typeof(object));
@@ -113,6 +113,66 @@ namespace CSVLibrary
                         for (int j = 0; j < datas.Length; j++)
                         {
                             props[j].SetValue(t, datas[headerManager.headerPlace[props[j].Name]]);
+                        }
+
+                        _list.Add(t);
+                    }
+
+                    if (lineCount >= start + quantity) break;
+                }
+            }
+
+            return _list;
+        }
+
+        public static List<T> OptimizeRead<T>(string path, int start, int quantity) where T : class, new()
+        {
+            List<T> _list = new List<T>();
+
+            if (setters == null)
+            {
+                Type = typeof(T);
+                props = Type.GetProperties();
+
+                setters = props.Select(x => CreateSetter(x)).ToArray();
+            }
+
+            //HeaderManager headerManager = new HeaderManager();
+            //headerManager.GetFileHeaderPlace(path);
+
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line = sr.ReadLine(); // exclude headers
+
+                string[] datas = new string[props.Length];
+
+                int lineCount = 0;
+                while (!sr.EndOfStream)
+                {
+                    line = sr.ReadLine();
+                    lineCount++;
+
+                    if (lineCount >= start && lineCount < start + quantity)
+                    {
+                        ReadOnlySpan<char> dataAsSpan = line.AsSpan();
+                        int index = 0;
+
+                        T t = new T();
+                        while (true)
+                        {
+                            int commaPos = dataAsSpan.IndexOf(',');
+                            if (commaPos == -1)
+                            {
+                                //datas[index] = dataAsSpan.ToString();
+                                setters[index++](t, dataAsSpan.ToString());
+                                break;
+                            }
+
+                            //datas[index++] = dataAsSpan.Slice(0, commaPos).ToString();
+
+                            setters[index++](t, dataAsSpan.Slice(0, commaPos).ToString());
+
+                            dataAsSpan = dataAsSpan.Slice(commaPos + 1);
                         }
 
                         _list.Add(t);
